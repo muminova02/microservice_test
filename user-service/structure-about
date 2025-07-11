@@ -1,0 +1,17 @@
+user-service/
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   └── com/
+│   │   │       └── example/
+│   │   │           └── userservice/
+│   │   │               ├── model/
+│   │   │               ├── repository/
+│   │   │               ├── service/
+│   │   │               ├── web/
+│   │   │               │   ├── controller/
+│   │   │               │   └── dto/
+│   │   │               └── UserServiceApplication.java
+│   │   └── resources/
+│   │       └── application.yml
+└── pom.xml
