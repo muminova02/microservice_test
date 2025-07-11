@@ -4,15 +4,24 @@ import com.example.userservice.model.User;
 import com.example.userservice.service.UserService;
 import com.example.userservice.web.dto.UserDto;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/users")
+@Tag(name = "User Management", description = "APIs for managing user profiles")
 public class UserController {
 
     private final UserService userService;
@@ -20,6 +29,30 @@ public class UserController {
     @Autowired
     public UserController(UserService userService) {
         this.userService = userService;
+    }
+
+
+    @Operation(
+            summary = "Get user health check",
+            description = "Returns health status of user service"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Service is healthy",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = Map.class)
+                    )
+            )
+    })
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, Object>> health() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "UP");
+        response.put("service", "user-service");
+        response.put("timestamp", System.currentTimeMillis());
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping
