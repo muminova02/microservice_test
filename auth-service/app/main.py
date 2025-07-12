@@ -1,151 +1,94 @@
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from datetime import datetime, timedelta
-from typing import Optional
-from pydantic import BaseModel
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.cors import CORSMiddleware
+import logging
 import os
 
-app = FastAPI(title="Auth Service", description="Authentication and Authorization Service")
+from app.config import get_settings
+from app.routers import auth, health
+from app.telemetry import instrument_app, check_zipkin_connection
 
-# Security configs
-SECRET_KEY = os.getenv("SECRET_KEY", "very-secret-key-should-be-in-env-in-production")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Models
-class User(BaseModel):
-    username: str
-    email: Optional[str] = None
-    full_name: Optional[str] = None
-    disabled: Optional[bool] = None
+# HTTP Bearer for token authentication
+security = HTTPBearer(auto_error=False)
 
-class UserInDB(User):
-    hashed_password: str
+settings = get_settings()
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan event handler for FastAPI application
+    """
+    # Startup
+    logger.info("======== AUTH SERVICE STARTING UP ========")
 
-class TokenData(BaseModel):
-    username: Optional[str] = None
+    # Log environment variables
+    logger.info("Environment variables:")
+    for key in ['ZIPKIN_URL', 'OTEL_TRACES_EXPORTER', 'OTEL_EXPORTER_ZIPKIN_ENDPOINT',
+                'OTEL_EXPORTER_ZIPKIN_PROTOCOL', 'OTEL_SERVICE_NAME']:
+        logger.info(f"{key}: {os.environ.get(key, 'NOT SET')}")
 
-# Fake users database for demo (real impl would use PostgreSQL)
-fake_users_db = {
-    "johndoe": {
-        "username": "johndoe",
-        "full_name": "John Doe",
-        "email": "johndoe@example.com",
-        "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",
-        "disabled": False,
+    # Check Zipkin connectivity
+    zipkin_status = check_zipkin_connection()
+    logger.info(f"Zipkin connectivity: {'OK' if zipkin_status else 'FAILED'}")
+
+    logger.info("Auth service started successfully")
+
+    yield
+
+    # Shutdown
+    logger.info("======== AUTH SERVICE SHUTTING DOWN ========")
+
+
+# Create FastAPI app with lifespan
+app = FastAPI(
+    title="Auth Service",
+    description="Authentication and authorization service",
+    version=settings.API_VERSION,
+    lifespan=lifespan
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Instrument the app with OpenTelemetry
+instrument_app(app)
+
+# Include routers
+app.include_router(auth.router, tags=["Authentication"])
+app.include_router(health.router, tags=["Health"])
+
+
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {
+        "message": "Auth Service is running",
+        "version": settings.API_VERSION,
+        "service": "auth-service"
     }
-}
 
-# Helper functions
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
 
-def get_password_hash(password):
-    return pwd_context.hash(password)
+@app.get("/protected")
+async def protected_endpoint(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Example protected endpoint"""
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Bearer token required")
 
-def get_user(db, username: str):
-    if username in db:
-        user_dict = db[username]
-        return UserInDB(**user_dict)
+    # In a real app, you would verify the token here
+    return {"message": "This is a protected endpoint", "token": credentials.credentials}
 
-def authenticate_user(fake_db, username: str, password: str):
-    user = get_user(fake_db, username)
-    if not user:
-        return False
-    if not verify_password(password, user.hashed_password):
-        return False
-    return user
-
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-async def get_current_user(token: str = Depends(oauth2_scheme)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-        token_data = TokenData(username=username)
-    except JWTError:
-        raise credentials_exception
-    user = get_user(fake_users_db, username=token_data.username)
-    if user is None:
-        raise credentials_exception
-    return user
-
-async def get_current_active_user(current_user: User = Depends(get_current_user)):
-    if current_user.disabled:
-        raise HTTPException(status_code=400, detail="Inactive user")
-    return current_user
-
-# Endpoints
-@app.post("/auth/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(fake_users_db, form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
-
-@app.post("/auth/register")
-async def register(username: str, email: str, password: str, full_name: str = None):
-    if username in fake_users_db:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already registered"
-        )
-
-    hashed_password = get_password_hash(password)
-    user_dict = {
-        "username": username,
-        "email": email,
-        "full_name": full_name,
-        "hashed_password": hashed_password,
-        "disabled": False
-    }
-    fake_users_db[username] = user_dict
-
-    # In real implementation, save to database and publish event to RabbitMQ
-    # about new user registration
-
-    return {"message": "User registered successfully"}
-
-@app.get("/auth/me", response_model=User)
-async def read_users_me(current_user: User = Depends(get_current_active_user)):
-    return current_user
-
-@app.get("/auth/validate")
-async def validate_token(current_user: User = Depends(get_current_active_user)):
-    return {"valid": True, "user": current_user}
 
 if __name__ == "__main__":
     import uvicorn
