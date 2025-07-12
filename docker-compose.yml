@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Infrastructure
   postgres:
@@ -33,6 +31,17 @@ services:
       - "5672:5672"  # AMQP port
       - "15672:15672"  # Management UI
 
+  zipkin:
+    image: openzipkin/zipkin
+    container_name: zipkin
+    restart: always
+    ports:
+      - "9411:9411"
+    environment:
+      - STORAGE_TYPE=mem
+
+
+
   # Core services
   service-registry:
     build: ./service-registry
@@ -49,6 +58,9 @@ services:
       - "8080:8080"
     depends_on:
       - service-registry
+      - zipkin
+    environment:
+      - ZIPKIN_URL=http://zipkin:9411
 
   # Microservices
   auth-service:
@@ -60,7 +72,9 @@ services:
     depends_on:
       - service-registry
       - postgres
-      - rabbitmq
+      - zipkin
+    environment:
+      - ZIPKIN_URL=http://zipkin:9411
 
   user-service:
     build: ./user-service
@@ -72,6 +86,9 @@ services:
       - service-registry
       - postgres
       - rabbitmq
+      - zipkin
+    environment:
+      - ZIPKIN_URL=http://zipkin:9411
 
   post-service:
     build: ./post-service
@@ -83,6 +100,9 @@ services:
       - service-registry
       - mongodb
       - rabbitmq
+      - zipkin
+    environment:
+      - ZIPKIN_URL=http://zipkin:9411
 
   admin-service:
     build: ./admin-service
@@ -94,7 +114,9 @@ services:
       - service-registry
       - postgres
       - rabbitmq
-
+      - zipkin
+    environment:
+      - ZIPKIN_URL=http://zipkin:9411
   target-service:
     build: ./target-service
     container_name: target-service
@@ -105,6 +127,9 @@ services:
       - service-registry
       - postgres
       - rabbitmq
+      - zipkin
+    environment:
+      - ZIPKIN_URL=http://zipkin:9411
 
   notification-service:
     build: ./notification-service
@@ -115,6 +140,10 @@ services:
     depends_on:
       - service-registry
       - rabbitmq
+      - zipkin
+    environment:
+      - ZIPKIN_URL=http://zipkin:9411
+
 
 volumes:
   postgres_data:

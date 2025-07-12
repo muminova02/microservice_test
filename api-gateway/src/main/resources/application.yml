@@ -22,3 +22,30 @@ eureka:
 
 jwt:
   secret: "supersecretkeyforjwttokensshouldbelongerthaninproduction"
+
+
+
+# Zipkin tracing configuration
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_URL:http://zipkin:9411}/api/v2/spans
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,tracing,gateway
+  endpoint:
+    health:
+      show-details: always
+
+# Logging with trace information
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO
+    com.example.apigateway: DEBUG
+    io.micrometer.tracing: DEBUG
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"

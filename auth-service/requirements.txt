@@ -1,10 +1,15 @@
-fastapi==0.109.0
-uvicorn==0.27.0
-python-jose==3.3.0
-passlib==1.7.4
-python-multipart==0.0.7
-pydantic==2.5.3
+fastapi==0.104.1
+uvicorn==0.24.0
+pydantic==2.5.0
+python-multipart==0.0.6
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+httpx==0.25.2
 pydantic-settings==2.1.0
-psycopg2-binary==2.9.9
-python-dotenv==1.0.0
-rabbitmq-pika==0.0.2
+
+# OpenTelemetry dependencies
+opentelemetry-api==1.20.0
+opentelemetry-sdk==1.20.0
+opentelemetry-exporter-zipkin-json==1.20.0
+opentelemetry-instrumentation-flask==0.41b0
+opentelemetry-instrumentation-requests==0.41b0
