@@ -14,16 +14,14 @@ spring:
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: http://service-registry:8761/eureka/
     register-with-eureka: true
     fetch-registry: true
   instance:
     prefer-ip-address: true
 
 jwt:
-  secret: "very-secret-key-should-be-in-env-in-production"
-
-
+  secret: "supersecretkeyforjwttokensshouldbelongerthaninproduction"
 
 # Zipkin tracing configuration
 management:
@@ -32,7 +30,7 @@ management:
       probability: 1.0
   zipkin:
     tracing:
-      endpoint: http://localhost:9411/api/v2/spans
+      endpoint: ${ZIPKIN_URL:http://zipkin:9411}/api/v2/spans
   endpoints:
     web:
       exposure:

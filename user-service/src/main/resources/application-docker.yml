@@ -5,7 +5,7 @@ spring:
   application:
     name: user-service
   datasource:
-    url: jdbc:postgresql://localhost:5433/userdb
+    url: jdbc:postgresql://postgres:5432/userdb
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
@@ -18,7 +18,7 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
   rabbitmq:
-    host: localhost
+    host: rabbitmq
     port: 5672
     username: guest
     password: guest
@@ -26,12 +26,11 @@ spring:
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: http://service-registry:8761/eureka/
     register-with-eureka: true
     fetch-registry: true
   instance:
     prefer-ip-address: true
-
 
 # Swagger/OpenAPI Configuration
 springdoc:
@@ -53,7 +52,7 @@ management:
       probability: 1.0
   zipkin:
     tracing:
-      endpoint: http://zipkin:9411/api/v2/spans
+      endpoint: ${ZIPKIN_URL:http://zipkin:9411}/api/v2/spans
   endpoints:
     web:
       exposure:
@@ -61,7 +60,6 @@ management:
   endpoint:
     health:
       show-details: always
-
 
 logging:
   level:

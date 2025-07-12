@@ -1,24 +1,11 @@
 server:
-  port: 8081
+  port: 8085
 
 spring:
   application:
-    name: user-service
-  datasource:
-    url: jdbc:postgresql://localhost:5433/userdb
-    username: postgres
-    password: postgres
-    driver-class-name: org.postgresql.Driver
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+    name: notification-service
   rabbitmq:
-    host: localhost
+    host: rabbitmq
     port: 5672
     username: guest
     password: guest
@@ -26,12 +13,11 @@ spring:
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: http://service-registry:8761/eureka/
     register-with-eureka: true
     fetch-registry: true
   instance:
     prefer-ip-address: true
-
 
 # Swagger/OpenAPI Configuration
 springdoc:
@@ -53,7 +39,7 @@ management:
       probability: 1.0
   zipkin:
     tracing:
-      endpoint: http://zipkin:9411/api/v2/spans
+      endpoint: ${ZIPKIN_URL:http://zipkin:9411}/api/v2/spans
   endpoints:
     web:
       exposure:
@@ -62,13 +48,10 @@ management:
     health:
       show-details: always
 
-
 logging:
   level:
-    com.example.userservice: DEBUG
+    com.example.notificationservice: DEBUG
     org.springframework.web: INFO
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
     io.micrometer.tracing: DEBUG
   pattern:
     level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"

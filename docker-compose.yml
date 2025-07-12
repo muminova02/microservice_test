@@ -13,6 +13,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    networks:
+      - microservices_network
 
   mongodb:
     image: mongo:6
@@ -22,6 +24,8 @@ services:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
+    networks:
+      - microservices_network
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -30,6 +34,8 @@ services:
     ports:
       - "5672:5672"  # AMQP port
       - "15672:15672"  # Management UI
+    networks:
+      - microservices_network
 
   zipkin:
     image: openzipkin/zipkin
@@ -39,8 +45,8 @@ services:
       - "9411:9411"
     environment:
       - STORAGE_TYPE=mem
-
-
+    networks:
+      - microservices_network
 
   # Core services
   service-registry:
@@ -49,6 +55,10 @@ services:
     restart: always
     ports:
       - "8761:8761"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    networks:
+      - microservices_network
 
   api-gateway:
     build: ./api-gateway
@@ -61,6 +71,9 @@ services:
       - zipkin
     environment:
       - ZIPKIN_URL=http://zipkin:9411
+      - SPRING_PROFILES_ACTIVE=docker
+    networks:
+      - microservices_network
 
   # Microservices
   auth-service:
@@ -70,11 +83,16 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - service-registry
       - postgres
       - zipkin
     environment:
       - ZIPKIN_URL=http://zipkin:9411
+      - OTEL_TRACES_EXPORTER=zipkin
+      - OTEL_EXPORTER_ZIPKIN_ENDPOINT=http://zipkin:9411/api/v2/spans
+      - OTEL_EXPORTER_ZIPKIN_PROTOCOL=http/json
+      - OTEL_SERVICE_NAME=auth-service
+    networks:
+      - microservices_network
 
   user-service:
     build: ./user-service
@@ -89,6 +107,9 @@ services:
       - zipkin
     environment:
       - ZIPKIN_URL=http://zipkin:9411
+      - SPRING_PROFILES_ACTIVE=docker
+    networks:
+      - microservices_network
 
   post-service:
     build: ./post-service
@@ -103,6 +124,9 @@ services:
       - zipkin
     environment:
       - ZIPKIN_URL=http://zipkin:9411
+      - SPRING_PROFILES_ACTIVE=docker
+    networks:
+      - microservices_network
 
   admin-service:
     build: ./admin-service
@@ -117,6 +141,10 @@ services:
       - zipkin
     environment:
       - ZIPKIN_URL=http://zipkin:9411
+      - SPRING_PROFILES_ACTIVE=docker
+    networks:
+      - microservices_network
+
   target-service:
     build: ./target-service
     container_name: target-service
@@ -130,6 +158,9 @@ services:
       - zipkin
     environment:
       - ZIPKIN_URL=http://zipkin:9411
+      - SPRING_PROFILES_ACTIVE=docker
+    networks:
+      - microservices_network
 
   notification-service:
     build: ./notification-service
@@ -143,8 +174,14 @@ services:
       - zipkin
     environment:
       - ZIPKIN_URL=http://zipkin:9411
-
+      - SPRING_PROFILES_ACTIVE=docker
+    networks:
+      - microservices_network
 
 volumes:
   postgres_data:
   mongodb_data:
+
+networks:
+  microservices_network:
+    driver: bridge
